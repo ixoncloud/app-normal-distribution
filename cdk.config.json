@@ -1,0 +1,14 @@
+{
+  "$schema": "./node_modules/@ixon-cdk/core/config/schema.json",
+  "prefix": "pct",
+  "components": {
+    "normal-distribution": {
+      "runner": {
+        "build": {
+          "builder": "@ixon-cdk/svelte-builder:browser",
+          "input": "normal-distribution.svelte"
+        }
+      }
+    }
+  }
+}

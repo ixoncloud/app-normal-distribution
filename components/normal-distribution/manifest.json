@@ -1,0 +1,56 @@
+{
+  "main": "pct-normal-distribution.min.js",
+  "version": "1",
+  "sheetSettings": {
+    "defaultCols": 6,
+    "defaultRows": 6,
+    "minCols": 3,
+    "minRows": 3
+  },
+  "inputs": [
+    {
+      "key": "header",
+      "type": "Group",
+      "label": "Info",
+      "children": [
+        {
+          "key": "title",
+          "type": "String",
+          "label": "Title",
+          "placeholder": "Leave empty for no title"
+        },
+        {
+          "key": "subtitle",
+          "type": "String",
+          "label": "Subtitle",
+          "placeholder": "Leave empty for no subtitle"
+        }
+      ]
+    },
+    {
+      "key": "dataSource",
+      "type": "Group",
+      "label": "Input",
+      "summary": {
+        "label": "Data Source"
+      },
+      "children": [
+        {
+          "key": "metric",
+          "type": "RawMetric",
+          "label": "Metric",
+          "placeholder": "Enter the metric to display",
+          "required": true
+        }
+      ]
+    },
+    {
+      "key": "confidenceLevelPercentage",
+      "type": "Number",
+      "label": "Confidence Level Percentage",
+      "placeholder": "Enter the confidence level",
+      "default": 95,
+      "required": true
+    }
+  ]
+}
