@@ -149,8 +149,8 @@
       zScore
     );
 
-    xMin = normalData[0][0];
-    xMax = normalData[normalData.length - 1][0];
+    const xMin = normalData[0][0];
+    const xMax = normalData[normalData.length - 1][0];
 
     const option = {
       title: {
