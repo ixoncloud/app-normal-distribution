@@ -10,6 +10,7 @@
   let chartEl: HTMLDivElement;
   let rootEl: HTMLDivElement;
   let myChart;
+  let ignoreZero = false;
 
   let confidenceLevelPercentage = 95;
 
@@ -34,24 +35,36 @@
   }
 
   function generateNormalDistributionData(
-    mean: number,
-    standardDeviation: number,
-    resolution?: number // Optional resolution parameter
+    mean,
+    standardDeviation,
+    dataLength,
+    binSize,
+    maxY // This is the maximum Y value from your histogram data
   ) {
-    const defaultResolution = standardDeviation / 50; // Default value, you can adjust this
-    const step = resolution || defaultResolution;
+    const xValues = [];
+    const yValues = [];
+    let maxYDistrib = 0; // To find the maximum Y value of the normal distribution
 
-    const numPoints = Math.ceil((10 * standardDeviation) / step); // Covering from mean - 5*stddev to mean + 5*stddev
+    for (
+      let x = mean - 5 * standardDeviation;
+      x <= mean + 5 * standardDeviation;
+      x += binSize
+    ) {
+      xValues.push(x);
+      const y =
+        normalDistribution(x, mean, standardDeviation) * dataLength * binSize;
+      yValues.push(y);
+      if (y > maxYDistrib) {
+        maxYDistrib = y; // Update the maximum Y value of the normal distribution
+      }
+    }
 
-    const xValues = Array.from(
-      { length: numPoints },
-      (_, i) => mean - 5 * standardDeviation + i * step
-    );
+    // Scale the distribution so it doesn't exceed the maximum Y value of the histogram
+    const scaleRatio = maxY / maxYDistrib;
+    const scaledYValues = yValues.map((y) => y * scaleRatio);
 
-    return xValues.map((x) => [
-      x,
-      normalDistribution(x, mean, standardDeviation),
-    ]);
+    // Combine the x and y values into a single array of [x, y] pairs
+    return xValues.map((x, i) => [x, scaledYValues[i]]);
   }
 
   function getZScoreForConfidence(confidence: number): number {
@@ -67,81 +80,135 @@
     return jStat.normal.inv(p, 0, 1);
   }
 
+  function getConfidenceInterval(mean, standardDeviation, zScore) {
+    return [
+      mean - zScore * standardDeviation,
+      mean + zScore * standardDeviation,
+    ];
+  }
+
   async function getDataAndDraw() {
     myChart.showLoading();
 
-    const data = await new DataService(context).getAllRawMetrics();
-    // console.log("data", data);
+    let data = await new DataService(context).getAllRawMetrics();
 
     if (!data?.length) {
+      myChart.hideLoading();
       return;
+    }
+
+    if (ignoreZero) {
+      data = data.filter((d) => d.value !== 0);
     }
 
     const { mean, standardDeviation } = calculateStatistics(data);
 
+    // Sort data by value to assist in histogram calculation
+    data.sort((a, b) => a.value - b.value);
+
+    // Create histogram data
+    const histogramData = [];
+    let lastVal = data[0].value;
+    let count = 0;
+
+    data.forEach((point) => {
+      if (point.value === lastVal) {
+        count++;
+      } else {
+        histogramData.push({ value: [lastVal, count] });
+        lastVal = point.value;
+        count = 1;
+      }
+    });
+
+    histogramData.push({ value: [lastVal, count] });
+
+    const binSize = standardDeviation / 2;
+
+    const maxY = Math.max(...histogramData.map((data) => data.value[1]));
+
+    const normalData = generateNormalDistributionData(
+      mean,
+      standardDeviation,
+      data.length,
+      binSize,
+      maxY // pass the maximum Y value here
+    );
+
     const zScore = getZScoreForConfidence(confidenceLevelPercentage);
-    const ci = [
-      mean - zScore * standardDeviation,
-      mean + zScore * standardDeviation,
-    ];
-
-    // console.log("mean", mean);
-    // console.log("standardDeviation", standardDeviation);
-
-    const normalData = generateNormalDistributionData(mean, standardDeviation);
-
-    // console.log("normalData", normalData);
-
-    const minYValue = Math.min(...normalData.map((item) => item[1]));
-    // console.log("minYValue", minYValue);
+    console.log("zScore", zScore);
+    const [lowerBound, upperBound] = getConfidenceInterval(
+      mean,
+      standardDeviation,
+      zScore
+    );
 
     const option = {
       title: {
-        text: "Normal Distribution",
+        text: "Normal Distribution and Actual Data",
       },
       tooltip: {
-        trigger: "axis",
+        trigger: "item",
         axisPointer: {
           type: "cross",
+        },
+        formatter: function (params) {
+          return `Value: ${params.value[0]}<br>Count: ${params.value[1]}`;
         },
       },
       xAxis: {
         type: "value",
-        name: "Value", // Updated x-axis name
-        min: mean - 5 * standardDeviation,
-        max: mean + 5 * standardDeviation,
+        name: "Value",
         axisLine: {
-          onZero: false, // Do not align y-axis line with x-axis' zero position
-          // onZeroAxisIndex: minYValue, // Align y-axis line with the minimum y-value
+          onZero: false,
+        },
+        min: normalData[0][0],
+        max: normalData[normalData.length - 1][0],
+        splitLine: {
+          show: false,
         },
       },
       yAxis: {
         type: "value",
-        name: "Frequency", // Updated y-axis name,
+        name: "Count",
+        max: "dataMax",
         axisLine: {
-          onZero: false, // Do not align y-axis line with x-axis' zero position
-          // onZeroAxisIndex: minYValue, // Align y-axis line with the minimum y-value
+          onZero: false,
         },
       },
       series: [
         {
+          name: "Histogram",
+          type: "bar",
+          data: histogramData,
+          barWidth: "99%",
+          itemStyle: {
+            color: "#5470C6",
+            opacity: 0.7,
+          },
+        },
+        {
           name: "Normal Distribution",
           type: "line",
-          smooth: true,
           data: normalData,
-          areaStyle: {},
+          smooth: true,
+          lineStyle: {
+            width: 2,
+            color: "#FF0000",
+          },
           markArea: {
             silent: true,
+            itemStyle: {
+              color: "rgba(255, 0, 0, 0.5)",
+            },
             data: [
               [
                 {
-                  xAxis: ci[0],
-                  itemStyle: {
-                    color: "rgba(100, 149, 237, 0.2)", // CornflowerBlue color for CI
-                  },
+                  name: "Confidence Interval",
+                  xAxis: lowerBound,
                 },
                 {
-                  xAxis: ci[1],
+                  xAxis: upperBound,
                 },
               ],
             ],
@@ -149,14 +216,15 @@
         },
       ],
     };
+
     myChart.setOption(option);
-    myChart.resize();
     myChart.hideLoading();
   }
 
   onMount(async () => {
     // console.log("context", context);
     confidenceLevelPercentage = context.inputs.confidenceLevelPercentage;
+    ignoreZero = context.inputs.ignoreZero;
 
     myChart = echarts.init(chartEl);
     const resizeObserver = runResizeObserver(rootEl, () => {

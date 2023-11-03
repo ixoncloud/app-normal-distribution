@@ -49,7 +49,14 @@
       "type": "Number",
       "label": "Confidence Level Percentage",
       "placeholder": "Enter the confidence level",
-      "default": 95,
+      "defaultValue": 95,
+      "required": true
+    },
+    {
+      "key": "ignoreZero",
+      "type": "Checkbox",
+      "label": "Ignore Zero",
+      "defaultValue": false,
       "required": true
     }
   ]
