@@ -11,6 +11,7 @@
   let rootEl: HTMLDivElement;
   let myChart;
   let ignoreZero = false;
+  let error = "";
 
   let confidenceLevelPercentage = 95;
 
@@ -92,8 +93,13 @@
 
     let data = await new DataService(context).getAllRawMetrics();
 
+    // data.value must be a number
+    data = data?.filter((d) => !isNaN(d.value));
+
     if (!data?.length) {
       myChart.hideLoading();
+      error = "No data available or input is not a number";
+      console.log(error);
       return;
     }
 
@@ -143,6 +149,9 @@
       zScore
     );
 
+    xMin = normalData[0][0];
+    xMax = normalData[normalData.length - 1][0];
+
     const option = {
       title: {
         text: "Normal Distribution and Actual Data",
@@ -162,8 +171,8 @@
         axisLine: {
           onZero: false,
         },
-        min: normalData[0][0],
-        max: normalData[normalData.length - 1][0],
+        min: xMin,
+        max: xMax,
         splitLine: {
           show: false,
         },
@@ -244,6 +253,11 @@
 </script>
 
 <div class="card" bind:this={rootEl}>
+  {#if error}
+    <div class="card-content">
+      <div class="error">{error}</div>
+    </div>
+  {/if}
   <div class="chart" bind:this={chartEl} />
 </div>
 
