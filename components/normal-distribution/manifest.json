@@ -39,6 +39,7 @@
           "key": "metric",
           "type": "RawMetric",
           "label": "Metric",
+          "allowedTypes": ["int", "float", "bool"],
           "placeholder": "Enter the metric to display",
           "required": true
         }

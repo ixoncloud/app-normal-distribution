@@ -98,7 +98,7 @@
 
     if (!data?.length) {
       myChart.hideLoading();
-      error = "No data available or input is not a number";
+      error = "No data available";
       console.log(error);
       return;
     }
