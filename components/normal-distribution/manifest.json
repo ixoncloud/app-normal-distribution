@@ -3,9 +3,15 @@
   "version": "1",
   "sheetSettings": {
     "defaultCols": 6,
-    "defaultRows": 6,
-    "minCols": 3,
-    "minRows": 3
+    "defaultRows": 5,
+    "minCols": 6,
+    "minRows": 5
+  },
+  "reportSettings": {
+    "defaultCols": 6,
+    "defaultRows": 5,
+    "minCols": 6,
+    "minRows": 5
   },
   "inputs": [
     {

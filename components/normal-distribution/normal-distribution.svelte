@@ -12,7 +12,7 @@
   let myChart;
   let ignoreZero = false;
   let error = "";
-
+  let header: { title: string; subtitle: string };
   let confidenceLevelPercentage = 95;
 
   function calculateStatistics(data: { time: number; value: number }[]) {
@@ -93,13 +93,26 @@
 
     let data = await new DataService(context).getAllRawMetrics();
 
+    const decimals = context.inputs.dataSource.metric.decimals;
+    const unit = context.inputs.dataSource.metric.unit;
+    const factor = context.inputs.dataSource.metric.factor;
+
+    // convert data with decimals and factor
+    data = data.map((d) => {
+      const value = factor ? d.value * factor : d.value;
+      const valueFormatted = Number(value.toFixed(decimals));
+      return {
+        ...d,
+        value: valueFormatted,
+      };
+    });
+
     // data.value must be a number
     data = data?.filter((d) => !isNaN(d.value));
 
     if (!data?.length) {
       myChart.hideLoading();
       error = "No data available";
-      console.log(error);
       return;
     }
 
@@ -142,7 +155,7 @@
     );
 
     const zScore = getZScoreForConfidence(confidenceLevelPercentage);
-    console.log("zScore", zScore);
+
     const [lowerBound, upperBound] = getConfidenceInterval(
       mean,
       standardDeviation,
@@ -152,34 +165,41 @@
     const xMin = normalData[0][0];
     const xMax = normalData[normalData.length - 1][0];
 
+    // round to 2 decimals xmin and xmax
+    const xMinRounded = Number(xMin.toFixed(2));
+    const xMaxRounded = Number(xMax.toFixed(2));
+
     const option = {
-      title: {
-        text: "Normal Distribution and Actual Data",
-      },
+      // title: {
+      //   text: "Normal Distribution and Actual Data",
+      // },
       tooltip: {
         trigger: "item",
         axisPointer: {
           type: "cross",
         },
         formatter: function (params) {
-          return `Value: ${params.value[0]}<br>Count: ${params.value[1]}`;
+          return `Value: ${params.value[0]}<br>Frequency: ${params.value[1]}`;
         },
+      },
+      legend: {
+        data: ["Histogram", "Normal Distribution"],
       },
       xAxis: {
         type: "value",
-        name: "Value",
+        name: "Value" + (unit ? ` (${unit})` : ""),
         axisLine: {
           onZero: false,
         },
-        min: xMin,
-        max: xMax,
+        min: xMinRounded,
+        max: xMaxRounded,
         splitLine: {
           show: false,
         },
       },
       yAxis: {
         type: "value",
-        name: "Count",
+        name: "Frequency",
         max: "dataMax",
         axisLine: {
           onZero: false,
@@ -200,38 +220,62 @@
           name: "Normal Distribution",
           type: "line",
           data: normalData,
+          showSymbol: false,
           smooth: true,
           lineStyle: {
             width: 2,
-            color: "#FF0000",
+            color: "rgba(255, 0, 0, 0.5)",
           },
-          markArea: {
-            silent: true,
+          tooltip: {
+            show: false,
+          },
+          markLine: {
+            symbol: ["none", "none", "none"],
+            label: {
+              normal: {
+                show: true,
+              },
+            },
             itemStyle: {
               color: "rgba(255, 0, 0, 0.5)",
             },
+            tooltip: {
+              show: false,
+            },
             data: [
-              [
-                {
-                  name: "Confidence Interval",
-                  xAxis: lowerBound,
-                },
-                {
-                  xAxis: upperBound,
-                },
-              ],
+              { name: "Lower Bound", xAxis: lowerBound },
+              { name: "Mean", xAxis: mean },
+              { name: "Upper Bound", xAxis: upperBound },
             ],
           },
+          // markArea: {
+          //   silent: true,
+          //   itemStyle: {
+          //     color: "rgba(255, 0, 0, 0.5)",
+          //   },
+          //   data: [
+          //     [
+          //       {
+          //         name: "Confidence Interval",
+          //         xAxis: lowerBound,
+          //       },
+          //       {
+          //         xAxis: upperBound,
+          //       },
+          //     ],
+          //   ],
+          // },
         },
       ],
     };
 
     myChart.setOption(option);
+    myChart.resize();
     myChart.hideLoading();
   }
 
   onMount(async () => {
-    // console.log("context", context);
+    header = context ? context.inputs.header : undefined;
     confidenceLevelPercentage = context.inputs.confidenceLevelPercentage;
     ignoreZero = context.inputs.ignoreZero;
 
@@ -253,6 +297,16 @@
 </script>
 
 <div class="card" bind:this={rootEl}>
+  {#if header && (header.title || header.subtitle)}
+    <div class="card-header">
+      {#if header.title}
+        <h3 class="card-title">{header.title}</h3>
+      {/if}
+      {#if header.subtitle}
+        <h4 class="card-subtitle">{header.subtitle}</h4>
+      {/if}
+    </div>
+  {/if}
   {#if error}
     <div class="card-content">
       <div class="error">{error}</div>
@@ -269,6 +323,7 @@
   }
 
   .chart {
+    margin-left: -4px;
     position: relative;
     height: 100%;
     width: 100%;
