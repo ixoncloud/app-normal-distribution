@@ -93,17 +93,19 @@
 
     let data = await new DataService(context).getAllRawMetrics();
 
-    const decimals = context.inputs.dataSource.metric.decimals;
-    const unit = context.inputs.dataSource.metric.unit;
-    const factor = context.inputs.dataSource.metric.factor;
+    // ignore decimals for now as they are not relevant
 
-    // convert data with decimals and factor
+    // const decimals = context.inputs.dataSource.metric.decimals;
+    const unit = context.inputs.dataSource.metric.unit;
+    const factor = context.inputs.dataSource.metric.factor || 1;
+
+    // convert data with factor
     data = data.map((d) => {
-      const value = factor ? d.value * factor : d.value;
-      const valueFormatted = Number(value.toFixed(decimals));
+      let value = d.value * factor;
+
       return {
         ...d,
-        value: valueFormatted,
+        value,
       };
     });
 
@@ -165,9 +167,15 @@
     const xMin = normalData[0][0];
     const xMax = normalData[normalData.length - 1][0];
 
-    // round to 2 decimals xmin and xmax
-    const xMinRounded = Number(xMin.toFixed(2));
-    const xMaxRounded = Number(xMax.toFixed(2));
+    // round to 2 decimals xmin and xmax determine the decimals based on the number itself but round to as little decimals as possible it should never be -0 or 0
+    // example: xMin -0.00008514424433531524
+    // example: xMax 0.00019342010640428076
+    // example: xMinRounded -0.0001
+    // example: xMaxRounded 0.0002
+    // smallest factor: 0.000001
+
+    const xMinRounded = Math.round(xMin * 100000) / 100000;
+    const xMaxRounded = Math.round(xMax * 100000) / 100000;
 
     const option = {
       // title: {
@@ -179,7 +187,7 @@
           type: "cross",
         },
         formatter: function (params) {
-          return `Value: ${params.value[0]}<br>Frequency: ${params.value[1]}`;
+          return `Value: ${params.value[0]} ${unit}<br>Frequency: ${params.value[1]}`;
         },
       },
       legend: {
@@ -187,7 +195,7 @@
       },
       xAxis: {
         type: "value",
-        name: "Value" + (unit ? ` (${unit})` : ""),
+        name: "Value",
         axisLine: {
           onZero: false,
         },
@@ -248,23 +256,6 @@
               { name: "Upper Bound", xAxis: upperBound },
             ],
           },
-          // markArea: {
-          //   silent: true,
-          //   itemStyle: {
-          //     color: "rgba(255, 0, 0, 0.5)",
-          //   },
-          //   data: [
-          //     [
-          //       {
-          //         name: "Confidence Interval",
-          //         xAxis: lowerBound,
-          //       },
-          //       {
-          //         xAxis: upperBound,
-          //       },
-          //     ],
-          //   ],
-          // },
         },
       ],
     };
@@ -324,6 +315,7 @@
 
   .chart {
     margin-left: -4px;
+    margin-top: 16px;
     position: relative;
     height: 100%;
     width: 100%;
