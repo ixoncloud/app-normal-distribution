@@ -42,6 +42,10 @@
     binSize,
     maxY // This is the maximum Y value from your histogram data
   ) {
+    if (dataLength <= 1) {
+      return [];
+    }
+
     const xValues = [];
     const yValues = [];
     let maxYDistrib = 0; // To find the maximum Y value of the normal distribution
@@ -52,9 +56,11 @@
       x += binSize
     ) {
       xValues.push(x);
+
       const y =
         normalDistribution(x, mean, standardDeviation) * dataLength * binSize;
       yValues.push(y);
+
       if (y > maxYDistrib) {
         maxYDistrib = y; // Update the maximum Y value of the normal distribution
       }
@@ -89,6 +95,7 @@
   }
 
   async function getDataAndDraw() {
+    error = "";
     myChart.showLoading();
 
     let data = await new DataService(context).getAllRawMetrics();
@@ -155,6 +162,12 @@
       binSize,
       maxY // pass the maximum Y value here
     );
+
+    if (!normalData?.length) {
+      myChart.hideLoading();
+      error = `Not enough data available, mean = ${mean}`;
+      return;
+    }
 
     const zScore = getZScoreForConfidence(confidenceLevelPercentage);
 
@@ -308,10 +321,6 @@
 
 <style lang="scss">
   @import "./styles/card";
-
-  .card-content {
-    overflow: hidden;
-  }
 
   .chart {
     margin-left: -4px;
