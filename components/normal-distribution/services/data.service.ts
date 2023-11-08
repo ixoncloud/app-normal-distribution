@@ -49,7 +49,7 @@ export class DataService {
       .split(".tag.")[0]
       .split("Agent#selected:")[1];
 
-    const agent = await this._getAgent();
+    const agent = (await this._getAgent()) as Agent;
 
     const sources: DataSource[] = await this._getDataSources(agent, sourceSlug);
     const tags: Tag[] = await this._getTags(agent, [tagSlug]);
