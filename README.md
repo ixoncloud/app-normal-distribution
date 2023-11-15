@@ -1,4 +1,4 @@
-# State Analysis App
+# Normal Distribution App
 
 This workspace contains the Normal Distribution app for IXON Cloud. It can be used to analyze key metrics such as speed or product dimensions effectively. It is based on the [IXON Cloud Custom Component Development Kit](https://developer.ixon.cloud/docs/custom-components). Note that this app is built with [Svelte](https://svelte.dev/), [Typescript](https://www.typescriptlang.org/) and [SCSS](https://sass-lang.com/). It requires you to be familiar with the [Node.js](https://nodejs.org/) ecosystem.
 
