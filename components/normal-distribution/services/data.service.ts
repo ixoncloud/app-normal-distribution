@@ -1,4 +1,4 @@
-import type { ComponentContext } from "@ixon-cdk/types";
+import type { ComponentContext } from '@ixon-cdk/types';
 
 type Agent = {
   publicId: string;
@@ -30,11 +30,11 @@ export class DataService {
   constructor(context: ComponentContext) {
     this.context = context;
     this.headers = {
-      "Content-Type": "application/json",
-      Authorization: "Bearer " + this.context.appData.accessToken.secretId,
-      "Api-Application": this.context.appData.apiAppId,
-      "Api-Company": this.context.appData.company.publicId,
-      "Api-Version": "2",
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + this.context.appData.accessToken.secretId,
+      'Api-Application': this.context.appData.apiAppId,
+      'Api-Company': this.context.appData.company.publicId,
+      'Api-Version': '2',
     };
   }
 
@@ -44,10 +44,10 @@ export class DataService {
     }
 
     const tagSlug =
-      this.context.inputs.dataSource.metric.selector.split(".tag.")[1];
+      this.context.inputs.dataSource.metric.selector.split('.tag.')[1];
     const sourceSlug = this.context.inputs.dataSource.metric.selector
-      .split(".tag.")[0]
-      .split("Agent#selected:")[1];
+      .split('.tag.')[0]
+      .split('Agent#selected:')[1];
 
     const agent = (await this._getAgent()) as Agent;
 
@@ -97,15 +97,15 @@ export class DataService {
     const queryLimit = 5000;
     const start = this._toIXONISOString(this.context.timeRange.from);
     const end = this._toIXONISOString(this.context.timeRange.to);
-    const url = this.context.getApiUrl("DataList");
+    const url = this.context.getApiUrl('DataList');
     const body = {
       start,
       end,
-      timeZone: "UTC",
+      timeZone: 'UTC',
       source: { publicId: sourceId },
       tags: tagSlugs.map((slug) => ({
         slug: slug,
-        preAggr: "raw",
+        preAggr: 'raw',
         queries: [
           {
             ref: slug,
@@ -117,7 +117,7 @@ export class DataService {
     };
     const response = await fetch(url, {
       headers: this.headers,
-      method: "POST",
+      method: 'POST',
       body: JSON.stringify(body),
     }).then((res) => res.json());
 
@@ -138,18 +138,18 @@ export class DataService {
     const initialUnixTimestamp = 0;
     const start = this._toIXONISOString(initialUnixTimestamp);
     const end = this._toIXONISOString(this.context.timeRange.from);
-    const url = this.context.getApiUrl("DataList");
+    const url = this.context.getApiUrl('DataList');
     const body = {
       start,
       end,
-      timeZone: "UTC",
+      timeZone: 'UTC',
       source: { publicId: sourceId },
       tags: tagSlugs.map((slug) => ({
         slug: slug,
-        preAggr: "raw",
+        preAggr: 'raw',
         queries: [
           {
-            postAggr: "last",
+            postAggr: 'raw',
             ref: slug,
             limit: 1,
           },
@@ -158,7 +158,7 @@ export class DataService {
     };
     const response = await fetch(url, {
       headers: this.headers,
-      method: "POST",
+      method: 'POST',
       body: JSON.stringify(body),
     }).then((res) => res.json());
     const lastPointOfPreviousPeriod = response.data.points[0];
@@ -171,7 +171,7 @@ export class DataService {
   }
 
   _toIXONISOString(milliSeconds: number) {
-    return new Date(milliSeconds).toISOString().split(".")[0] + "Z";
+    return new Date(milliSeconds).toISOString().split('.')[0] + 'Z';
   }
 
   private async _getAgent() {
@@ -179,7 +179,7 @@ export class DataService {
     return new Promise((resolve, reject) => {
       const client = this.context.createResourceDataClient();
       cancel = client.query(
-        { selector: "Agent", fields: ["publicId"] },
+        { selector: 'Agent', fields: ['publicId'] },
         ([result]) => {
           if (result.data) {
             if (cancel) {
@@ -187,7 +187,7 @@ export class DataService {
             }
             resolve(result.data);
           } else {
-            reject(new Error("Agent not found"));
+            reject(new Error('Agent not found'));
           }
         }
       );
@@ -196,38 +196,38 @@ export class DataService {
 
   async _getDataSources(agent: Agent, slug: string): Promise<DataSource[]> {
     const url =
-      this.context.getApiUrl("AgentDataSourceList", {
+      this.context.getApiUrl('AgentDataSourceList', {
         agentId: agent.publicId,
       }) +
-      "?fields=*,publicId,agent.publicId" +
+      '?fields=*,publicId,agent.publicId' +
       `&filters=eq(slug,"${slug}")`;
     const response = await fetch(url, {
       headers: this.headers,
-      method: "GET",
+      method: 'GET',
     }).then((res) => res.json());
     return response.data;
   }
 
   async _getTags(agent: Agent, slugs: string[]): Promise<Tag[]> {
-    const filters = this._getFilters([{ property: "slug", values: slugs }]);
+    const filters = this._getFilters([{ property: 'slug', values: slugs }]);
     const url =
-      this.context.getApiUrl("AgentDataTagList", {
+      this.context.getApiUrl('AgentDataTagList', {
         agentId: agent.publicId,
       }) +
-      "?fields=*,source.publicId,agent.publicId" +
+      '?fields=*,source.publicId,agent.publicId' +
       filters;
     const response = await fetch(url, {
       headers: this.headers,
-      method: "GET",
+      method: 'GET',
     }).then((res) => res.json());
     return response.data;
   }
 
   _getFilters(kwargs: { property: string; values: string[] }[]) {
     return kwargs.length === 0
-      ? ""
+      ? ''
       : `&filters=in(${kwargs
           .map((x) => `${x.property},"${x.values.join('","')}"`)
-          .join(")&filters=in(")})`;
+          .join(')&filters=in(')})`;
   }
 }
