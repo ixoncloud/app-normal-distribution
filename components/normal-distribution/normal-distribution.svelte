@@ -1,15 +1,16 @@
 <script lang="ts">
-  import { onMount, tick, onDestroy } from "svelte";
-  import type { ComponentContext } from "@ixon-cdk/types";
-  import { ChartService } from "./services/chart.service";
-  import { runResizeObserver } from "./utils/resize-observer";
+  import { onMount, tick, onDestroy } from 'svelte';
+  import type { ComponentContext } from '@ixon-cdk/types';
+  import { ChartService } from './services/chart.service';
+  import { runResizeObserver } from './utils/resize-observer';
 
   export let context: ComponentContext;
   let chartEl: HTMLDivElement;
   let rootEl: HTMLDivElement;
-  let error: string = "";
+  let error: string = '';
   let header: { title: string; subtitle: string };
   let standardDeviation = 0;
+  let decimals = 2;
   let resizeObserver: ResizeObserver;
   let chartService: ChartService;
 
@@ -22,13 +23,14 @@
         ignoreZero
       );
     } catch (err: any) {
-      error = err.message || "An unexpected error occurred";
+      error = err.message || 'An unexpected error occurred';
     }
   };
 
   // Use onMount lifecycle hook for setup
   onMount(async () => {
     header = context?.inputs.header;
+    decimals = context?.inputs.dataSource?.metric?.decimals ?? 2;
     chartService = new ChartService(context, chartEl);
 
     // Setup resize observer
@@ -68,14 +70,18 @@
   {/if}
   {#if standardDeviation}
     <div class="standard-deviation">
-      <span>Standard deviation: {standardDeviation.toFixed(2)}</span>
+      <span
+        >Standard deviation: {decimals === 0
+          ? Math.round(standardDeviation).toString()
+          : standardDeviation.toFixed(decimals)}</span
+      >
     </div>
   {/if}
   <div class="chart" bind:this={chartEl} />
 </div>
 
 <style lang="scss">
-  @import "./styles/card";
+  @import './styles/card';
 
   .standard-deviation {
     padding-top: 8px;

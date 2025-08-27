@@ -1,12 +1,12 @@
-import * as echarts from "echarts";
+import * as echarts from 'echarts';
 import {
   calculateStatistics,
   generateNormalDistributionData,
   getZScoreForConfidence,
   getConfidenceInterval,
-} from "../utils/statistics";
-import { DataService } from "./data.service";
-import type { ComponentContext } from "@ixon-cdk/types";
+} from '../utils/statistics';
+import { DataService } from './data.service';
+import type { ComponentContext } from '@ixon-cdk/types';
 
 export class ChartService {
   context: ComponentContext;
@@ -25,32 +25,23 @@ export class ChartService {
   ): Promise<number> {
     this.myChart.showLoading();
 
-    let data = await new DataService(this.context).getAllRawMetrics();
+    const unit = this.context.inputs.dataSource.metric.unit;
+    const factor = this.context.inputs.dataSource.metric.factor || 1;
+    const decimals = this.context.inputs.dataSource.metric.decimals ?? 2;
+
+    let data = await new DataService(this.context).getAllRawMetrics(
+      factor,
+      decimals
+    );
 
     if (!data) {
       this.myChart.hideLoading();
-      throw new Error("No data available");
+      throw new Error('No data available');
     }
-
-    const unit = this.context.inputs.dataSource.metric.unit;
-    const factor = this.context.inputs.dataSource.metric.factor || 1;
-
-    // convert data with factor
-    data = data.map((d) => {
-      let value = d.value * factor;
-
-      return {
-        ...d,
-        value,
-      };
-    });
-
-    // data.value must be a number
-    data = data?.filter((d) => !isNaN(d.value));
 
     if (!data?.length) {
       this.myChart.hideLoading();
-      throw new Error("No data available");
+      throw new Error('No data available');
     }
 
     if (ignoreZero) {
@@ -60,25 +51,28 @@ export class ChartService {
     const { mean, standardDeviation } = calculateStatistics(data);
     this.standardDeviation = standardDeviation;
 
-    // Sort data by value to assist in histogram calculation
+    // Sort data by value to assist in histogram calculation (data is already rounded from data service)
     data.sort((a, b) => a.value - b.value);
 
-    // Create histogram data
-    const histogramData = [];
-    let lastVal = data[0].value;
-    let count = 0;
+    // Create histogram data by grouping values
+    const histogramData: { value: [number, number] }[] = [];
+    const valueCounts = new Map<number, number>();
 
+    // Count occurrences of each value
     data.forEach((point) => {
-      if (point.value === lastVal) {
-        count++;
-      } else {
-        histogramData.push({ value: [lastVal, count] });
-        lastVal = point.value;
-        count = 1;
-      }
+      const value = point.value;
+      valueCounts.set(value, (valueCounts.get(value) || 0) + 1);
     });
 
-    histogramData.push({ value: [lastVal, count] });
+    // Convert to histogram format
+    valueCounts.forEach((count, value) => {
+      histogramData.push({
+        value: [value, count],
+      });
+    });
+
+    // Sort histogram data by value
+    histogramData.sort((a, b) => a.value[0] - b.value[0]);
 
     const binSize = standardDeviation / 2;
 
@@ -109,35 +103,41 @@ export class ChartService {
     const xMin = normalData[0][0];
     const xMax = normalData[normalData.length - 1][0];
 
-    // round to 2 decimals xmin and xmax determine the decimals based on the number itself but round to as little decimals as possible it should never be -0 or 0
-    // example: xMin -0.00008514424433531524
-    // example: xMax 0.00019342010640428076
-    // example: xMinRounded -0.0001
-    // example: xMaxRounded 0.0002
-    // smallest factor: 0.000001
-
-    const xMinRounded = Math.round(xMin * 100000) / 100000;
-    const xMaxRounded = Math.round(xMax * 100000) / 100000;
+    // Round xMin and xMax to the specified number of decimals
+    const multiplier = Math.pow(10, decimals);
+    const xMinRounded = Math.round(xMin * multiplier) / multiplier;
+    const xMaxRounded = Math.round(xMax * multiplier) / multiplier;
 
     const option = {
       // title: {
       //   text: "Normal Distribution and Actual Data",
       // },
       tooltip: {
-        trigger: "item",
+        trigger: 'item',
         axisPointer: {
-          type: "cross",
+          type: 'cross',
         },
-        formatter: function (params) {
-          return `Value: ${params.value[0]} ${unit}<br>Frequency: ${params.value[1]}`;
+        formatter: (params: any) => {
+          let value: string;
+          if (typeof params.value[0] === 'number') {
+            if (decimals === 0) {
+              value = Math.round(params.value[0]).toString();
+            } else {
+              value = Number(params.value[0]).toFixed(decimals);
+            }
+          } else {
+            value = params.value[0];
+          }
+          const unitText = unit ? ` ${unit}` : '';
+          return `Value: ${value}${unitText}<br>Frequency: ${params.value[1]}`;
         },
       },
       legend: {
-        data: ["Histogram", "Normal distribution"],
+        data: ['Histogram', 'Normal distribution'],
       },
       xAxis: {
-        type: "value",
-        name: "Value",
+        type: 'value',
+        name: 'Value',
         axisLine: {
           onZero: false,
         },
@@ -148,54 +148,75 @@ export class ChartService {
         },
       },
       yAxis: {
-        type: "value",
-        name: "Frequency",
-        max: "dataMax",
+        type: 'value',
+        name: 'Frequency',
+        max: 'dataMax',
         axisLine: {
           onZero: false,
         },
       },
       series: [
         {
-          name: "Histogram",
-          type: "bar",
+          name: 'Histogram',
+          type: 'bar',
           data: histogramData,
-          barWidth: "99%",
+          barWidth: '99%',
           itemStyle: {
-            color: "#5470C6",
+            color: '#5470C6',
             opacity: 0.7,
           },
         },
         {
-          name: "Normal distribution",
-          type: "line",
+          name: 'Normal distribution',
+          type: 'line',
           data: normalData,
           showSymbol: false,
           smooth: true,
           lineStyle: {
             width: 2,
-            color: "rgba(255, 0, 0, 0.5)",
+            color: 'rgba(255, 0, 0, 0.5)',
           },
           tooltip: {
             show: false,
           },
           markLine: {
-            symbol: ["none", "none", "none"],
+            symbol: ['none', 'none', 'none'],
             label: {
               normal: {
                 show: true,
               },
             },
             itemStyle: {
-              color: "rgba(255, 0, 0, 0.5)",
+              color: 'rgba(255, 0, 0, 0.5)',
             },
             tooltip: {
               show: false,
             },
             data: [
-              { name: "Lower Bound", xAxis: lowerBound },
-              { name: "Mean", xAxis: mean },
-              { name: "Upper Bound", xAxis: upperBound },
+              {
+                name: `Lower Bound: ${
+                  decimals === 0
+                    ? Math.round(lowerBound).toString()
+                    : lowerBound.toFixed(decimals)
+                }`,
+                xAxis: lowerBound,
+              },
+              {
+                name: `Mean: ${
+                  decimals === 0
+                    ? Math.round(mean).toString()
+                    : mean.toFixed(decimals)
+                }`,
+                xAxis: mean,
+              },
+              {
+                name: `Upper Bound: ${
+                  decimals === 0
+                    ? Math.round(upperBound).toString()
+                    : upperBound.toFixed(decimals)
+                }`,
+                xAxis: upperBound,
+              },
             ],
           },
         },

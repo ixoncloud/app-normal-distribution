@@ -38,7 +38,10 @@ export class DataService {
     };
   }
 
-  async getAllRawMetrics(): Promise<{ time: number; value: any }[] | null> {
+  async getAllRawMetrics(
+    factor = 1,
+    decimals = 2
+  ): Promise<{ time: number; value: number }[] | null> {
     if (!this.context.inputs.dataSource?.metric) {
       return null;
     }
@@ -71,10 +74,16 @@ export class DataService {
       []
     );
 
-    return allMetricsOfTagSlug.map((x) => ({
-      time: Date.parse(x.time),
-      value: x.values[tagSlug],
-    }));
+    return allMetricsOfTagSlug
+      .map((x) => ({
+        time: Date.parse(x.time),
+        value: x.values[tagSlug],
+      }))
+      .filter((d) => !isNaN(d.value)) // Filter out non-numeric values
+      .map((d) => ({
+        ...d,
+        value: parseFloat((d.value * factor).toFixed(decimals)), // Apply factor and round to decimals
+      }));
   }
 
   async _getAllRawMetrics(
