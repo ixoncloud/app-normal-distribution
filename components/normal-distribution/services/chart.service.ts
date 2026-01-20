@@ -1,12 +1,31 @@
-import * as echarts from 'echarts';
+import * as echarts from 'echarts/core';
+import { BarChart, LineChart } from 'echarts/charts';
+import {
+  TooltipComponent,
+  LegendComponent,
+  GridComponent,
+  MarkLineComponent,
+} from 'echarts/components';
+import { SVGRenderer } from 'echarts/renderers';
 import {
   calculateStatistics,
   generateNormalDistributionData,
   getZScoreForConfidence,
   getConfidenceInterval,
 } from '../utils/statistics';
-import { DataService } from './data.service';
+import { DataService, type ProgressCallback } from './data.service';
 import type { ComponentContext } from '@ixon-cdk/types';
+
+// Register only the components we need for tree-shaking
+echarts.use([
+  BarChart,
+  LineChart,
+  TooltipComponent,
+  LegendComponent,
+  GridComponent,
+  MarkLineComponent,
+  SVGRenderer,
+]);
 
 export class ChartService {
   context: ComponentContext;
@@ -15,38 +34,39 @@ export class ChartService {
 
   constructor(context: ComponentContext, chartEl: HTMLDivElement) {
     this.context = context;
-    this.myChart = echarts.init(chartEl);
+    // Use SVGRenderer for better PDF export quality (vector-based, sharper)
+    this.myChart = echarts.init(chartEl, null, { renderer: 'svg' });
     this.standardDeviation = 0;
   }
 
   async getDataAndDraw(
     confidenceLevelPercentage = 95,
-    ignoreZero = false
+    ignoreZero = false,
+    onProgress?: ProgressCallback
   ): Promise<number> {
-    this.myChart.showLoading();
-
     const unit = this.context.inputs.dataSource.metric.unit;
     const factor = this.context.inputs.dataSource.metric.factor || 1;
     const decimals = this.context.inputs.dataSource.metric.decimals ?? 2;
 
     let data = await new DataService(this.context).getAllRawMetrics(
       factor,
-      decimals
+      decimals,
+      onProgress
     );
 
     if (!data) {
-      this.myChart.hideLoading();
       throw new Error('No data available');
     }
 
     if (!data?.length) {
-      this.myChart.hideLoading();
       throw new Error('No data available');
     }
 
     if (ignoreZero) {
       data = data.filter((d) => d.value !== 0);
     }
+
+    onProgress?.('Processing...', 0, 0);
 
     const { mean, standardDeviation } = calculateStatistics(data);
     this.standardDeviation = standardDeviation;
@@ -87,7 +107,6 @@ export class ChartService {
     );
 
     if (!normalData?.length) {
-      this.myChart.hideLoading();
       const error = `Not enough data available, mean = ${mean}`;
       throw new Error(error);
     }
@@ -109,6 +128,8 @@ export class ChartService {
     const xMaxRounded = Math.round(xMax * multiplier) / multiplier;
 
     const option = {
+      // Disable animations for instant rendering (critical for PDF snapshots)
+      animation: false,
       // title: {
       //   text: "Normal Distribution and Actual Data",
       // },
@@ -150,7 +171,8 @@ export class ChartService {
       yAxis: {
         type: 'value',
         name: 'Frequency',
-        max: 'dataMax',
+        min: 0,
+        max: maxY,
         axisLine: {
           onZero: false,
         },
@@ -223,9 +245,9 @@ export class ChartService {
       ],
     };
 
-    this.myChart.setOption(option);
+    // Use notMerge: true to avoid merging with previous state (cleaner re-renders)
+    this.myChart.setOption(option, { notMerge: true });
     this.myChart.resize();
-    this.myChart.hideLoading();
 
     return standardDeviation;
   }
