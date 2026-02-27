@@ -150,9 +150,10 @@ export class DataService {
     // we have to look back for the latest state outside of the current period
     // to fill in the gap between the last point of the previous period and the
     // first point of the current period.
-    // we do this by taking the first unix timestamp
-    const initialUnixTimestamp = 0;
-    const start = this._toIXONISOString(initialUnixTimestamp);
+    // we do this by taking the unix timestamp of 2000-01-01 (earliest possible query date for the DataList endpoint).
+    const UnixTimestamp2000_01_01Seconds = 946684800;
+    // Unix timestamps are in seconds; _toIXONISOString expects milliseconds.
+    const start = this._toIXONISOString(UnixTimestamp2000_01_01Seconds * 1000);
     const end = this._toIXONISOString(this.context.timeRange.from);
     const url = this.context.getApiUrl('DataList');
     const body = {
