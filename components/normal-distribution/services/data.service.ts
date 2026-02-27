@@ -26,7 +26,7 @@ type Metric = {
 export type ProgressCallback = (
   stage: string,
   current?: number,
-  total?: number
+  total?: number,
 ) => void;
 
 export class DataService {
@@ -47,7 +47,7 @@ export class DataService {
   async getAllRawMetrics(
     factor = 1,
     decimals = 2,
-    onProgress?: ProgressCallback
+    onProgress?: ProgressCallback,
   ): Promise<{ time: number; value: number }[] | null> {
     if (!this.context.inputs.dataSource?.metric) {
       return null;
@@ -78,7 +78,7 @@ export class DataService {
     const allMetricsOfTagSlug = await this._getAllRawMetricsParallel(
       sourceId,
       [tagSlug],
-      onProgress
+      onProgress,
     );
 
     return allMetricsOfTagSlug
@@ -98,7 +98,7 @@ export class DataService {
     tagSlugs: string[],
     hasNext = true,
     offset = 0,
-    metrics: Metric[] = []
+    metrics: Metric[] = [],
   ): Promise<Metric[]> {
     if (!hasNext) {
       // lastPointOfPreviousPeriod is used to fill in the gap between the last point of the previous period and the first point of the current period.
@@ -199,7 +199,7 @@ export class DataService {
    */
   async _fetchWithConcurrencyLimit<T>(
     tasks: (() => Promise<T>)[],
-    maxConcurrent: number = 10
+    maxConcurrent: number = 10,
   ): Promise<T[]> {
     const results: T[] = new Array(tasks.length);
     const executing: Map<number, Promise<void>> = new Map();
@@ -232,12 +232,12 @@ export class DataService {
     const start = this._toIXONISOString(this.context.timeRange.from);
     const end = this._toIXONISOString(this.context.timeRange.to);
     const url = this.context.getApiUrl('DataList');
-    
+
     // Calculate step to span entire time range (in seconds) to get a single bucket with true count
     const timeRangeDurationSeconds = Math.ceil(
-      (this.context.timeRange.to - this.context.timeRange.from) / 1000
+      (this.context.timeRange.to - this.context.timeRange.from) / 1000,
     );
-    
+
     const body = {
       start,
       end,
@@ -274,7 +274,7 @@ export class DataService {
     tagSlug: string,
     offset: number,
     limit: number,
-    retries: number = 3
+    retries: number = 3,
   ): Promise<Metric[]> {
     const start = this._toIXONISOString(this.context.timeRange.from);
     const end = this._toIXONISOString(this.context.timeRange.to);
@@ -310,7 +310,13 @@ export class DataService {
     if (response.status === 429 && retries > 0) {
       const backoffMs = (4 - retries) * 1000; // 1s, 2s, 3s
       await new Promise((resolve) => setTimeout(resolve, backoffMs));
-      return this._fetchRawDataPage(sourceId, tagSlug, offset, limit, retries - 1);
+      return this._fetchRawDataPage(
+        sourceId,
+        tagSlug,
+        offset,
+        limit,
+        retries - 1,
+      );
     }
 
     const data = await response.json();
@@ -320,7 +326,7 @@ export class DataService {
   async _getAllRawMetricsParallel(
     sourceId: string,
     tagSlugs: string[],
-    onProgress?: ProgressCallback
+    onProgress?: ProgressCallback,
   ): Promise<Metric[]> {
     const tagSlug = tagSlugs[0];
     const queryLimit = 5000;
@@ -333,7 +339,7 @@ export class DataService {
     if (totalCount === 0) {
       const lastPoint = await this._getLastPointOfPreviousPeriod(
         sourceId,
-        tagSlugs
+        tagSlugs,
       );
       return lastPoint ? [lastPoint] : [];
     }
@@ -341,11 +347,16 @@ export class DataService {
     // Step 2: If small dataset, fetch in one request
     if (totalCount <= queryLimit) {
       onProgress?.('Fetching data...', 0, 1);
-      const data = await this._fetchRawDataPage(sourceId, tagSlug, 0, queryLimit);
+      const data = await this._fetchRawDataPage(
+        sourceId,
+        tagSlug,
+        0,
+        queryLimit,
+      );
       onProgress?.('Fetching data...', 1, 1);
       const lastPoint = await this._getLastPointOfPreviousPeriod(
         sourceId,
-        tagSlugs
+        tagSlugs,
       );
       if (lastPoint) {
         data.push(lastPoint);
@@ -356,22 +367,31 @@ export class DataService {
     // Step 3: Calculate pages and fetch with concurrency limit
     const pagesNeeded = Math.ceil(totalCount / queryLimit);
     const maxConcurrent = 10; // Stay well under 50 req/sec burst limit
-    
+
     // Track completed pages for progress reporting
     let completedPages = 0;
     onProgress?.('Fetching data...', 0, pagesNeeded);
-    
+
     // Create task functions (not promises) for the concurrency limiter
-    const fetchTasks = Array.from({ length: pagesNeeded }, (_, i) =>
-      async () => {
-        const result = await this._fetchRawDataPage(sourceId, tagSlug, i * queryLimit, queryLimit);
+    const fetchTasks = Array.from(
+      { length: pagesNeeded },
+      (_, i) => async () => {
+        const result = await this._fetchRawDataPage(
+          sourceId,
+          tagSlug,
+          i * queryLimit,
+          queryLimit,
+        );
         completedPages++;
         onProgress?.('Fetching data...', completedPages, pagesNeeded);
         return result;
-      }
+      },
     );
 
-    const results = await this._fetchWithConcurrencyLimit(fetchTasks, maxConcurrent);
+    const results = await this._fetchWithConcurrencyLimit(
+      fetchTasks,
+      maxConcurrent,
+    );
 
     // Merge all results (use concat instead of flat for better compatibility)
     const allMetrics: Metric[] = [];
@@ -382,7 +402,7 @@ export class DataService {
     // Step 4: Add lastPointOfPreviousPeriod
     const lastPoint = await this._getLastPointOfPreviousPeriod(
       sourceId,
-      tagSlugs
+      tagSlugs,
     );
     if (lastPoint) {
       allMetrics.push(lastPoint);
@@ -390,7 +410,7 @@ export class DataService {
 
     // Sort by time to ensure chronological order
     return allMetrics.sort(
-      (a: Metric, b: Metric) => Date.parse(a.time) - Date.parse(b.time)
+      (a: Metric, b: Metric) => Date.parse(a.time) - Date.parse(b.time),
     );
   }
 
@@ -409,7 +429,7 @@ export class DataService {
           } else {
             reject(new Error('Agent not found'));
           }
-        }
+        },
       );
     });
   }
