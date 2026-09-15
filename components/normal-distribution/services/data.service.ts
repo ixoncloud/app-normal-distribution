@@ -1,4 +1,4 @@
-import type { ComponentContext } from '@ixon-cdk/types';
+import type { ComponentContext } from "@ixon-cdk/types";
 
 type Agent = {
   publicId: string;
@@ -36,11 +36,11 @@ export class DataService {
   constructor(context: ComponentContext) {
     this.context = context;
     this.headers = {
-      'Content-Type': 'application/json',
-      Authorization: 'Bearer ' + this.context.appData.accessToken.secretId,
-      'Api-Application': this.context.appData.apiAppId,
-      'Api-Company': this.context.appData.company.publicId,
-      'Api-Version': '2',
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + this.context.appData.accessToken.secretId,
+      "Api-Application": this.context.appData.apiAppId,
+      "Api-Company": this.context.appData.company.publicId,
+      "Api-Version": "2",
     };
   }
 
@@ -53,13 +53,13 @@ export class DataService {
       return null;
     }
 
-    onProgress?.('Connecting...', 0, 0);
+    onProgress?.("Connecting...", 0, 0);
 
     const tagSlug =
-      this.context.inputs.dataSource.metric.selector.split('.tag.')[1];
+      this.context.inputs.dataSource.metric.selector.split(".tag.")[1];
     const sourceSlug = this.context.inputs.dataSource.metric.selector
-      .split('.tag.')[0]
-      .split('Agent#selected:')[1];
+      .split(".tag.")[0]
+      .split("Agent#selected:")[1];
 
     const agent = (await this._getAgent()) as Agent;
 
@@ -113,15 +113,15 @@ export class DataService {
     const queryLimit = 5000;
     const start = this._toIXONISOString(this.context.timeRange.from);
     const end = this._toIXONISOString(this.context.timeRange.to);
-    const url = this.context.getApiUrl('DataList');
+    const url = this.context.getApiUrl("DataList");
     const body = {
       start,
       end,
-      timeZone: 'UTC',
+      timeZone: "UTC",
       source: { publicId: sourceId },
       tags: tagSlugs.map((slug) => ({
         slug: slug,
-        preAggr: 'raw',
+        preAggr: "raw",
         queries: [
           {
             ref: slug,
@@ -133,7 +133,7 @@ export class DataService {
     };
     const response = await fetch(url, {
       headers: this.headers,
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(body),
     }).then((res) => res.json());
 
@@ -155,18 +155,18 @@ export class DataService {
     // Unix timestamps are in seconds; _toIXONISOString expects milliseconds.
     const start = this._toIXONISOString(UnixTimestamp2000_01_01Seconds * 1000);
     const end = this._toIXONISOString(this.context.timeRange.from);
-    const url = this.context.getApiUrl('DataList');
+    const url = this.context.getApiUrl("DataList");
     const body = {
       start,
       end,
-      timeZone: 'UTC',
+      timeZone: "UTC",
       source: { publicId: sourceId },
       tags: tagSlugs.map((slug) => ({
         slug: slug,
-        preAggr: 'raw',
+        preAggr: "raw",
         queries: [
           {
-            postAggr: 'raw',
+            postAggr: "raw",
             ref: slug,
             limit: 1,
           },
@@ -175,7 +175,7 @@ export class DataService {
     };
     const response = await fetch(url, {
       headers: this.headers,
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(body),
     }).then((res) => res.json());
     const lastPointOfPreviousPeriod = response.data.points[0];
@@ -188,7 +188,7 @@ export class DataService {
   }
 
   _toIXONISOString(milliSeconds: number) {
-    return new Date(milliSeconds).toISOString().split('.')[0] + 'Z';
+    return new Date(milliSeconds).toISOString().split(".")[0] + "Z";
   }
 
   /**
@@ -232,7 +232,7 @@ export class DataService {
   async _getTotalCount(sourceId: string, tagSlug: string): Promise<number> {
     const start = this._toIXONISOString(this.context.timeRange.from);
     const end = this._toIXONISOString(this.context.timeRange.to);
-    const url = this.context.getApiUrl('DataList');
+    const url = this.context.getApiUrl("DataList");
 
     // Calculate step to span entire time range (in seconds) to get a single bucket with true count
     const timeRangeDurationSeconds = Math.ceil(
@@ -242,16 +242,16 @@ export class DataService {
     const body = {
       start,
       end,
-      timeZone: 'UTC',
+      timeZone: "UTC",
       source: { publicId: sourceId },
       tags: [
         {
           slug: tagSlug,
-          preAggr: 'raw',
+          preAggr: "raw",
           queries: [
             {
               ref: tagSlug,
-              postAggr: 'count',
+              postAggr: "count",
               step: timeRangeDurationSeconds, // Single bucket spanning entire range
             },
           ],
@@ -261,7 +261,7 @@ export class DataService {
 
     const response = await fetch(url, {
       headers: this.headers,
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(body),
     }).then((res) => res.json());
 
@@ -279,22 +279,22 @@ export class DataService {
   ): Promise<Metric[]> {
     const start = this._toIXONISOString(this.context.timeRange.from);
     const end = this._toIXONISOString(this.context.timeRange.to);
-    const url = this.context.getApiUrl('DataList');
+    const url = this.context.getApiUrl("DataList");
     const body = {
       start,
       end,
-      timeZone: 'UTC',
+      timeZone: "UTC",
       source: { publicId: sourceId },
       tags: [
         {
           slug: tagSlug,
-          preAggr: 'raw',
+          preAggr: "raw",
           queries: [
             {
               ref: tagSlug,
               limit: limit,
               offset: offset,
-              order: 'asc', // Ensure consistent ordering for parallel requests
+              order: "asc", // Ensure consistent ordering for parallel requests
             },
           ],
         },
@@ -303,7 +303,7 @@ export class DataService {
 
     const response = await fetch(url, {
       headers: this.headers,
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(body),
     });
 
@@ -333,7 +333,7 @@ export class DataService {
     const queryLimit = 5000;
 
     // Step 1: Get total count (single API call)
-    onProgress?.('Counting data points...', 0, 0);
+    onProgress?.("Counting data points...", 0, 0);
     const totalCount = await this._getTotalCount(sourceId, tagSlug);
 
     // Early return if no data
@@ -347,14 +347,14 @@ export class DataService {
 
     // Step 2: If small dataset, fetch in one request
     if (totalCount <= queryLimit) {
-      onProgress?.('Fetching data...', 0, 1);
+      onProgress?.("Fetching data...", 0, 1);
       const data = await this._fetchRawDataPage(
         sourceId,
         tagSlug,
         0,
         queryLimit,
       );
-      onProgress?.('Fetching data...', 1, 1);
+      onProgress?.("Fetching data...", 1, 1);
       const lastPoint = await this._getLastPointOfPreviousPeriod(
         sourceId,
         tagSlugs,
@@ -371,7 +371,7 @@ export class DataService {
 
     // Track completed pages for progress reporting
     let completedPages = 0;
-    onProgress?.('Fetching data...', 0, pagesNeeded);
+    onProgress?.("Fetching data...", 0, pagesNeeded);
 
     // Create task functions (not promises) for the concurrency limiter
     const fetchTasks = Array.from(
@@ -384,7 +384,7 @@ export class DataService {
           queryLimit,
         );
         completedPages++;
-        onProgress?.('Fetching data...', completedPages, pagesNeeded);
+        onProgress?.("Fetching data...", completedPages, pagesNeeded);
         return result;
       },
     );
@@ -420,7 +420,7 @@ export class DataService {
     return new Promise((resolve, reject) => {
       const client = this.context.createResourceDataClient();
       cancel = client.query(
-        { selector: 'Agent', fields: ['publicId'] },
+        { selector: "Agent", fields: ["publicId"] },
         ([result]) => {
           if (result.data) {
             if (cancel) {
@@ -428,7 +428,7 @@ export class DataService {
             }
             resolve(result.data);
           } else {
-            reject(new Error('Agent not found'));
+            reject(new Error("Agent not found"));
           }
         },
       );
@@ -437,38 +437,38 @@ export class DataService {
 
   async _getDataSources(agent: Agent, slug: string): Promise<DataSource[]> {
     const url =
-      this.context.getApiUrl('AgentDataSourceList', {
+      this.context.getApiUrl("AgentDataSourceList", {
         agentId: agent.publicId,
       }) +
-      '?fields=*,publicId,agent.publicId' +
+      "?fields=*,publicId,agent.publicId" +
       `&filters=eq(slug,"${slug}")`;
     const response = await fetch(url, {
       headers: this.headers,
-      method: 'GET',
+      method: "GET",
     }).then((res) => res.json());
     return response.data;
   }
 
   async _getTags(agent: Agent, slugs: string[]): Promise<Tag[]> {
-    const filters = this._getFilters([{ property: 'slug', values: slugs }]);
+    const filters = this._getFilters([{ property: "slug", values: slugs }]);
     const url =
-      this.context.getApiUrl('AgentDataTagList', {
+      this.context.getApiUrl("AgentDataTagList", {
         agentId: agent.publicId,
       }) +
-      '?fields=*,source.publicId,agent.publicId' +
+      "?fields=*,source.publicId,agent.publicId" +
       filters;
     const response = await fetch(url, {
       headers: this.headers,
-      method: 'GET',
+      method: "GET",
     }).then((res) => res.json());
     return response.data;
   }
 
   _getFilters(kwargs: { property: string; values: string[] }[]) {
     return kwargs.length === 0
-      ? ''
+      ? ""
       : `&filters=in(${kwargs
           .map((x) => `${x.property},"${x.values.join('","')}"`)
-          .join(')&filters=in(')})`;
+          .join(")&filters=in(")})`;
   }
 }

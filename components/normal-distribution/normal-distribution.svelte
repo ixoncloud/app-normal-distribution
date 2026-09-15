@@ -1,18 +1,18 @@
 <script lang="ts">
-  import { onMount, tick, onDestroy } from 'svelte';
-  import type { ComponentContext } from '@ixon-cdk/types';
-  import { ChartService } from './services/chart.service';
-  import { runResizeObserver } from './utils/resize-observer';
+  import { onMount, tick, onDestroy } from "svelte";
+  import type { ComponentContext } from "@ixon-cdk/types";
+  import { ChartService } from "./services/chart.service";
+  import { runResizeObserver } from "./utils/resize-observer";
 
   export let context: ComponentContext;
   let chartEl: HTMLDivElement;
   let rootEl: HTMLDivElement;
-  let error: string = '';
+  let error: string = "";
   let header: { title: string; subtitle: string };
   let standardDeviation = 0;
   let decimals = 2;
   let loading = true; // Explicit loading state to control what's visible during PDF snapshot
-  let loadingStage = 'Initializing...';
+  let loadingStage = "Initializing...";
   let loadingProgress = { current: 0, total: 0 };
   let resizeObserver: ResizeObserver;
   let chartService: ChartService;
@@ -21,9 +21,9 @@
   const updateChart = async () => {
     try {
       loading = true; // Set loading state before fetching data
-      loadingStage = 'Initializing...';
+      loadingStage = "Initializing...";
       loadingProgress = { current: 0, total: 0 };
-      error = ''; // Clear any previous errors
+      error = ""; // Clear any previous errors
       const { confidenceLevelPercentage, ignoreZero } = context.inputs;
       standardDeviation = await chartService.getDataAndDraw(
         confidenceLevelPercentage,
@@ -31,13 +31,13 @@
         (stage, current, total) => {
           loadingStage = stage;
           loadingProgress = { current: current || 0, total: total || 0 };
-        }
+        },
       );
       loading = false; // Chart is ready, hide loading state
       await tick(); // Wait for chart container to become visible
       chartService.myChart?.resize(); // Resize to fill component now that container has correct dimensions
     } catch (err: any) {
-      error = err.message || 'An unexpected error occurred';
+      error = err.message || "An unexpected error occurred";
       loading = false; // Even on error, stop showing loading state
     }
   };
@@ -107,7 +107,7 @@
 </div>
 
 <style lang="scss">
-  @import './styles/card';
+  @import "./styles/card";
 
   .standard-deviation {
     padding-top: 8px;
