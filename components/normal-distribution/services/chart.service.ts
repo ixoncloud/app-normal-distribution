@@ -29,14 +29,18 @@ echarts.use([
 
 export class ChartService {
   context: ComponentContext;
+  dataService: DataService;
   myChart: echarts.ECharts;
   standardDeviation: number;
+  canceledRequestsCount: number;
 
   constructor(context: ComponentContext, chartEl: HTMLDivElement) {
     this.context = context;
     // Use SVGRenderer for better PDF export quality (vector-based, sharper)
     this.myChart = echarts.init(chartEl, null, { renderer: "svg" });
     this.standardDeviation = 0;
+    this.canceledRequestsCount = 0;
+    this.dataService = new DataService(this.context);
   }
 
   async getDataAndDraw(
@@ -48,11 +52,25 @@ export class ChartService {
     const factor = this.context.inputs.dataSource.metric.factor || 1;
     const decimals = this.context.inputs.dataSource.metric.decimals ?? 2;
 
-    let data = await new DataService(this.context).getAllRawMetrics(
+    // Cancel previous data requests.
+    this.dataService.controllers.forEach((c) => c.abort());
+
+    // When using auto-refresh it could be that the component cannot load before he is hit again.
+    // If the component has been refreshed multiple times before data could finish loading,
+    // we throw an error to prevent further processing.
+    if (this.canceledRequestsCount >= 2) {
+      this.myChart?.clear();
+      throw new Error("Refresh occurred before data finished loading");
+    }
+
+    let data = await this.dataService.getAllRawMetrics(
       factor,
       decimals,
       onProgress,
     );
+
+    // reset canceled requests count after successful data fetch
+    this.canceledRequestsCount = 0;
 
     if (!data) {
       throw new Error("No data available");

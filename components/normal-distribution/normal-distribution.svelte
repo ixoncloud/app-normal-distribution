@@ -37,6 +37,14 @@
       await tick(); // Wait for chart container to become visible
       chartService.myChart?.resize(); // Resize to fill component now that container has correct dimensions
     } catch (err: any) {
+      // Duplicate requests were intentionally aborted and should not be treated as errors
+      if (err.name === "AbortError") {
+        chartService.canceledRequestsCount++;
+        return;
+      }
+      if (err.message === "Refresh occurred before data finished loading") {
+        standardDeviation = 0;
+      }
       error = err.message || "An unexpected error occurred";
       loading = false; // Even on error, stop showing loading state
     }
@@ -50,7 +58,7 @@
 
     // Setup resize observer
     resizeObserver = runResizeObserver(rootEl, () => {
-      tick().then(updateChart);
+      tick().then(() => chartService.myChart?.resize());
     });
 
     // Setup timerange change handler
@@ -63,6 +71,7 @@
   // Cleanup logic
   onDestroy(() => {
     context.ontimerangechange = null;
+    chartService.dataService.controllers.forEach((c) => c.abort());
     resizeObserver?.disconnect();
   });
 </script>

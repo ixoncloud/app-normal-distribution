@@ -31,6 +31,7 @@ export type ProgressCallback = (
 
 export class DataService {
   context;
+  controllers: AbortController[] = [];
   headers;
 
   constructor(context: ComponentContext) {
@@ -49,6 +50,8 @@ export class DataService {
     decimals = 2,
     onProgress?: ProgressCallback,
   ): Promise<{ time: number; value: number }[] | null> {
+    const controller = new AbortController();
+    this.controllers.push(controller);
     if (!this.context.inputs.dataSource?.metric) {
       return null;
     }
@@ -78,6 +81,7 @@ export class DataService {
     const allMetricsOfTagSlug = await this._getAllRawMetricsParallel(
       sourceId,
       [tagSlug],
+      controller,
       onProgress,
     );
 
@@ -93,58 +97,11 @@ export class DataService {
       }));
   }
 
-  async _getAllRawMetrics(
+  async _getLastPointOfPreviousPeriod(
     sourceId: string,
     tagSlugs: string[],
-    hasNext = true,
-    offset = 0,
-    metrics: Metric[] = [],
-  ): Promise<Metric[]> {
-    if (!hasNext) {
-      // lastPointOfPreviousPeriod is used to fill in the gap between the last point of the previous period and the first point of the current period.
-      const lastPointOfPreviousPeriod =
-        await this._getLastPointOfPreviousPeriod(sourceId, tagSlugs);
-      if (lastPointOfPreviousPeriod) {
-        return [...metrics, lastPointOfPreviousPeriod];
-      }
-      return metrics;
-    }
-
-    const queryLimit = 5000;
-    const start = this._toIXONISOString(this.context.timeRange.from);
-    const end = this._toIXONISOString(this.context.timeRange.to);
-    const url = this.context.getApiUrl("DataList");
-    const body = {
-      start,
-      end,
-      timeZone: "UTC",
-      source: { publicId: sourceId },
-      tags: tagSlugs.map((slug) => ({
-        slug: slug,
-        preAggr: "raw",
-        queries: [
-          {
-            ref: slug,
-            limit: queryLimit,
-            offset: offset,
-          },
-        ],
-      })),
-    };
-    const response = await fetch(url, {
-      headers: this.headers,
-      method: "POST",
-      body: JSON.stringify(body),
-    }).then((res) => res.json());
-
-    metrics = [...metrics, ...response.data.points];
-    offset += queryLimit;
-    hasNext = response.data.points.length === queryLimit;
-
-    return this._getAllRawMetrics(sourceId, tagSlugs, hasNext, offset, metrics);
-  }
-
-  async _getLastPointOfPreviousPeriod(sourceId: string, tagSlugs: string[]) {
+    controller: AbortController,
+  ) {
     // fixed a bug where the last point of the previous period was not shown:
     //
     // we have to look back for the latest state outside of the current period
@@ -177,6 +134,7 @@ export class DataService {
       headers: this.headers,
       method: "POST",
       body: JSON.stringify(body),
+      signal: controller.signal,
     }).then((res) => res.json());
     const lastPointOfPreviousPeriod = response.data.points[0];
     if (!lastPointOfPreviousPeriod) {
@@ -229,7 +187,11 @@ export class DataService {
     return results;
   }
 
-  async _getTotalCount(sourceId: string, tagSlug: string): Promise<number> {
+  async _getTotalCount(
+    sourceId: string,
+    tagSlug: string,
+    controller: AbortController,
+  ): Promise<number> {
     const start = this._toIXONISOString(this.context.timeRange.from);
     const end = this._toIXONISOString(this.context.timeRange.to);
     const url = this.context.getApiUrl("DataList");
@@ -263,6 +225,7 @@ export class DataService {
       headers: this.headers,
       method: "POST",
       body: JSON.stringify(body),
+      signal: controller.signal,
     }).then((res) => res.json());
 
     // The count is returned in the first point's values
@@ -275,8 +238,12 @@ export class DataService {
     tagSlug: string,
     offset: number,
     limit: number,
+    controller: AbortController,
     retries: number = 3,
   ): Promise<Metric[]> {
+    if (controller.signal.aborted) {
+      return [];
+    }
     const start = this._toIXONISOString(this.context.timeRange.from);
     const end = this._toIXONISOString(this.context.timeRange.to);
     const url = this.context.getApiUrl("DataList");
@@ -305,6 +272,7 @@ export class DataService {
       headers: this.headers,
       method: "POST",
       body: JSON.stringify(body),
+      signal: controller.signal,
     });
 
     // Handle rate limit errors with exponential backoff
@@ -316,6 +284,7 @@ export class DataService {
         tagSlug,
         offset,
         limit,
+        controller,
         retries - 1,
       );
     }
@@ -327,6 +296,7 @@ export class DataService {
   async _getAllRawMetricsParallel(
     sourceId: string,
     tagSlugs: string[],
+    controller: AbortController,
     onProgress?: ProgressCallback,
   ): Promise<Metric[]> {
     const tagSlug = tagSlugs[0];
@@ -334,13 +304,14 @@ export class DataService {
 
     // Step 1: Get total count (single API call)
     onProgress?.("Counting data points...", 0, 0);
-    const totalCount = await this._getTotalCount(sourceId, tagSlug);
+    const totalCount = await this._getTotalCount(sourceId, tagSlug, controller);
 
     // Early return if no data
     if (totalCount === 0) {
       const lastPoint = await this._getLastPointOfPreviousPeriod(
         sourceId,
         tagSlugs,
+        controller,
       );
       return lastPoint ? [lastPoint] : [];
     }
@@ -353,11 +324,13 @@ export class DataService {
         tagSlug,
         0,
         queryLimit,
+        controller,
       );
       onProgress?.("Fetching data...", 1, 1);
       const lastPoint = await this._getLastPointOfPreviousPeriod(
         sourceId,
         tagSlugs,
+        controller,
       );
       if (lastPoint) {
         data.push(lastPoint);
@@ -382,6 +355,7 @@ export class DataService {
           tagSlug,
           i * queryLimit,
           queryLimit,
+          controller,
         );
         completedPages++;
         onProgress?.("Fetching data...", completedPages, pagesNeeded);
@@ -404,6 +378,7 @@ export class DataService {
     const lastPoint = await this._getLastPointOfPreviousPeriod(
       sourceId,
       tagSlugs,
+      controller,
     );
     if (lastPoint) {
       allMetrics.push(lastPoint);
