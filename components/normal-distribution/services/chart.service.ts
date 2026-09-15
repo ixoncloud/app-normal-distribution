@@ -1,20 +1,20 @@
-import * as echarts from 'echarts/core';
-import { BarChart, LineChart } from 'echarts/charts';
+import * as echarts from "echarts/core";
+import { BarChart, LineChart } from "echarts/charts";
 import {
   TooltipComponent,
   LegendComponent,
   GridComponent,
   MarkLineComponent,
-} from 'echarts/components';
-import { SVGRenderer } from 'echarts/renderers';
+} from "echarts/components";
+import { SVGRenderer } from "echarts/renderers";
 import {
   calculateStatistics,
   generateNormalDistributionData,
   getZScoreForConfidence,
   getConfidenceInterval,
-} from '../utils/statistics';
-import { DataService, type ProgressCallback } from './data.service';
-import type { ComponentContext } from '@ixon-cdk/types';
+} from "../utils/statistics";
+import { DataService, type ProgressCallback } from "./data.service";
+import type { ComponentContext } from "@ixon-cdk/types";
 
 // Register only the components we need for tree-shaking
 echarts.use([
@@ -29,44 +29,62 @@ echarts.use([
 
 export class ChartService {
   context: ComponentContext;
+  dataService: DataService;
   myChart: echarts.ECharts;
   standardDeviation: number;
+  canceledRequestsCount: number;
 
   constructor(context: ComponentContext, chartEl: HTMLDivElement) {
     this.context = context;
     // Use SVGRenderer for better PDF export quality (vector-based, sharper)
-    this.myChart = echarts.init(chartEl, null, { renderer: 'svg' });
+    this.myChart = echarts.init(chartEl, null, { renderer: "svg" });
     this.standardDeviation = 0;
+    this.canceledRequestsCount = 0;
+    this.dataService = new DataService(this.context);
   }
 
   async getDataAndDraw(
     confidenceLevelPercentage = 95,
     ignoreZero = false,
-    onProgress?: ProgressCallback
+    onProgress?: ProgressCallback,
   ): Promise<number> {
     const unit = this.context.inputs.dataSource.metric.unit;
     const factor = this.context.inputs.dataSource.metric.factor || 1;
     const decimals = this.context.inputs.dataSource.metric.decimals ?? 2;
 
-    let data = await new DataService(this.context).getAllRawMetrics(
+    // Cancel previous data requests.
+    this.dataService.controllers.forEach((c) => c.abort());
+
+    // When using auto-refresh it could be that the component cannot load before he is hit again.
+    // If the component has been refreshed multiple times before data could finish loading,
+    // we throw an error to prevent further processing.
+    if (this.canceledRequestsCount >= 2) {
+      this.myChart?.clear();
+      throw new Error("Refresh occurred before data finished loading");
+    }
+
+    let data = await this.dataService.getAllRawMetrics(
       factor,
       decimals,
-      onProgress
+      onProgress,
     );
 
+    // reset canceled requests count after successful data fetch
+    this.canceledRequestsCount = 0;
+
     if (!data) {
-      throw new Error('No data available');
+      throw new Error("No data available");
     }
 
     if (!data?.length) {
-      throw new Error('No data available');
+      throw new Error("No data available");
     }
 
     if (ignoreZero) {
       data = data.filter((d) => d.value !== 0);
     }
 
-    onProgress?.('Processing...', 0, 0);
+    onProgress?.("Processing...", 0, 0);
 
     const { mean, standardDeviation } = calculateStatistics(data);
     this.standardDeviation = standardDeviation;
@@ -103,7 +121,7 @@ export class ChartService {
       standardDeviation,
       data.length,
       binSize,
-      maxY // pass the maximum Y value here
+      maxY, // pass the maximum Y value here
     );
 
     if (!normalData?.length) {
@@ -116,7 +134,7 @@ export class ChartService {
     const [lowerBound, upperBound] = getConfidenceInterval(
       mean,
       standardDeviation,
-      zScore
+      zScore,
     );
 
     const xMin = normalData[0][0];
@@ -134,13 +152,13 @@ export class ChartService {
       //   text: "Normal Distribution and Actual Data",
       // },
       tooltip: {
-        trigger: 'item',
+        trigger: "item",
         axisPointer: {
-          type: 'cross',
+          type: "cross",
         },
         formatter: (params: any) => {
           let value: string;
-          if (typeof params.value[0] === 'number') {
+          if (typeof params.value[0] === "number") {
             if (decimals === 0) {
               value = Math.round(params.value[0]).toString();
             } else {
@@ -149,16 +167,16 @@ export class ChartService {
           } else {
             value = params.value[0];
           }
-          const unitText = unit ? ` ${unit}` : '';
+          const unitText = unit ? ` ${unit}` : "";
           return `Value: ${value}${unitText}<br>Frequency: ${params.value[1]}`;
         },
       },
       legend: {
-        data: ['Histogram', 'Normal distribution'],
+        data: ["Histogram", "Normal distribution"],
       },
       xAxis: {
-        type: 'value',
-        name: 'Value',
+        type: "value",
+        name: "Value",
         axisLine: {
           onZero: false,
         },
@@ -169,8 +187,8 @@ export class ChartService {
         },
       },
       yAxis: {
-        type: 'value',
-        name: 'Frequency',
+        type: "value",
+        name: "Frequency",
         min: 0,
         max: maxY,
         axisLine: {
@@ -179,37 +197,37 @@ export class ChartService {
       },
       series: [
         {
-          name: 'Histogram',
-          type: 'bar',
+          name: "Histogram",
+          type: "bar",
           data: histogramData,
-          barWidth: '99%',
+          barWidth: "99%",
           itemStyle: {
-            color: '#5470C6',
+            color: "#5470C6",
             opacity: 0.7,
           },
         },
         {
-          name: 'Normal distribution',
-          type: 'line',
+          name: "Normal distribution",
+          type: "line",
           data: normalData,
           showSymbol: false,
           smooth: true,
           lineStyle: {
             width: 2,
-            color: 'rgba(255, 0, 0, 0.5)',
+            color: "rgba(255, 0, 0, 0.5)",
           },
           tooltip: {
             show: false,
           },
           markLine: {
-            symbol: ['none', 'none', 'none'],
+            symbol: ["none", "none", "none"],
             label: {
               normal: {
                 show: true,
               },
             },
             itemStyle: {
-              color: 'rgba(255, 0, 0, 0.5)',
+              color: "rgba(255, 0, 0, 0.5)",
             },
             tooltip: {
               show: false,
